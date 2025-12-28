@@ -1,0 +1,33 @@
+# VS Code settings
+.vscode/
+
+# Python virtual environments
+venv/
+.env/
+*.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit config (optional)
+.streamlit/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Model files (optional, kalau gak mau upload)
+*.pkl
+*.h5
+
+# CSV/data files (optional, kalau data besar)
+*.csv
+*.xlsx
