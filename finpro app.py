@@ -2,35 +2,34 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Konfigurasi Halaman
-st.set_page_config(page_title="Paris Housing Interactive Dashboard", layout="wide")
+st.set_page_config(page_title="Paris Housing Minpro", layout="wide")
 
 # --- LOAD DATA ---
 @st.cache_data
 def load_data():
     df = pd.read_csv('4. Paris Housing.csv')
+    # Preprocessing: Encoding kategori sesuai notebook
     le = LabelEncoder()
-    # Simpan kategori asli untuk dashboard, dan kategori encoded untuk machine learning
     df['category_encoded'] = le.fit_transform(df['category'])
     return df
 
 df = load_data()
 
 # --- SIDEBAR ---
-st.sidebar.title("Navigasi")
+st.sidebar.title("Navigasi Project")
 tab_selection = st.sidebar.radio("Pilih Tab:", ["About", "Dashboard", "Machine Learning", "Prediction App", "Kontak"])
 
 # ==========================================
 # TAB 1: ABOUT
 # ==========================================
 if tab_selection == "About":
-    st.title("🏠 About Dataset")
+    st.title("🏠 About Dataset - Paris Housing")
     st.markdown("""
     ### Paris Housing Price Dataset
     Dataset ini memberikan gambaran komprehensif mengenai pasar properti di Paris. 
@@ -42,148 +41,175 @@ if tab_selection == "About":
     - **Kualitas:** `isNewBuilt`, `category` (Basic/Luxury).
     - **Target:** `price` (dalam Euro).
     """)
+    st.write("#### Sampel Data Teratas:")
+    st.dataframe(df.head(10), use_container_width=True)
+# ==========================================
+# TAB 1: ABOUT
+# ==========================================
+if tab_selection == "About":
+    st.title("🏠 About Dataset - Paris Housing")
+    
+    # Menambahkan gambar dari URL yang Anda berikan
+    st.image("https://i.pinimg.com/originals/75/15/9c/75159cce34357a305ae8db7cba1a5436.jpg", 
+             caption="Paris Housing Architecture", 
+             use_container_width=True)
+
+    st.markdown("""
+    ### Deskripsi Proyek
+    Berdasarkan notebook **Minpro Data Housing**, proyek ini bertujuan untuk memprediksi harga properti di Paris menggunakan berbagai model regresi. 
+    Dataset ini mencakup berbagai spesifikasi teknis rumah seperti luas, jumlah lantai, hingga keberadaan fasilitas mewah.
+
+    **Struktur Data:**
+    - **Fitur Numerik:** Luas tanah, jumlah kamar, lantai, tahun pembuatan, dll.
+    - **Fitur Kategorikal:** Kategori (Basic/Luxury) yang telah di-encode.
+    - **Target:** `price` (Harga).
+    """)
+    st.write("#### Sampel Data Teratas:")
     st.dataframe(df.head(10), use_container_width=True)
 
 # ==========================================
-# TAB 2: DASHBOARD (Menggunakan Plotly Express)
+# TAB 2: DASHBOARD (Plotly Express)
 # ==========================================
 elif tab_selection == "Dashboard":
-    st.title("📊 Interactive Dashboard")
+    st.title("📊 Data Dashboard (Interaktif)")
     
     # KPI Row
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Data", f"{len(df):,}")
-    col2.metric("Rata-rata Harga", f"€{df['price'].mean():,.0f}")
-    col3.metric("Rata-rata Luas", f"{df['squareMeters'].mean():,.0f} m²")
-    col4.metric("% Luxury", f"{(df['category'] == 'Luxury').mean()*100:.1f}%")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Sampel", f"{len(df):,}")
+    col2.metric("Median Harga", f"€{df['price'].median():,.0f}")
+    col3.metric("Rata-rata Luas", f"{df['squareMeters'].mean():,.1f} m²")
 
     st.divider()
 
-    col_left, col_right = st.columns(2)
+    c1, c2 = st.columns(2)
 
-    with col_left:
-        st.subheader("Distribusi Harga Rumah")
-        fig_hist = px.histogram(df, x="price", nbins=50, 
-                                marginal="box", # Menambahkan boxplot di atas histogram
-                                title="Sebaran Harga (Euro)",
-                                color_discrete_sequence=['#636EFA'])
+    with c1:
+        st.subheader("Distribusi Harga")
+        fig_hist = px.histogram(df, x="price", nbins=40, marginal="violin", 
+                                title="Distribusi Variabel Target (Price)",
+                                color_discrete_sequence=['#1f77b4'])
         st.plotly_chart(fig_hist, use_container_width=True)
 
-    with col_right:
+    with c2:
         st.subheader("Hubungan Luas vs Harga")
-        fig_scatter = px.scatter(df.sample(2000), x="squareMeters", y="price", 
-                                 color="category", 
-                                 trendline="ols", # Menambahkan garis regresi
-                                 title="Luas (m²) vs Harga",
-                                 hover_data=['numberOfRooms'])
+        fig_scatter = px.scatter(df.sample(2500), x="squareMeters", y="price", 
+                                 color="category", opacity=0.6,
+                                 title="Korelasi Luas Tanah terhadap Harga",
+                                 trendline="ols")
         st.plotly_chart(fig_scatter, use_container_width=True)
 
-    col_left2, col_right2 = st.columns(2)
+    c3, c4 = st.columns(2)
 
-    with col_left2:
-        st.subheader("Matriks Korelasi (Heatmap)")
-        corr = df.corr(numeric_only=True)
-        fig_corr = px.imshow(corr, text_auto=".2f", 
-                             color_continuous_scale='RdBu_r',
-                             title="Korelasi Antar Fitur Numerik")
+    with c3:
+        st.subheader("Korelasi Fitur (Heatmap)")
+        # Hanya kolom numerik untuk korelasi
+        corr_matrix = df.select_dtypes(include=[np.number]).corr()
+        fig_corr = px.imshow(corr_matrix, text_auto=".2f", aspect="auto",
+                             title="Matriks Korelasi Numerik",
+                             color_continuous_scale='Blues')
         st.plotly_chart(fig_corr, use_container_width=True)
 
-    with col_right2:
-        st.subheader("Harga per Kategori & Kolam Renang")
-        fig_box = px.box(df, x="category", y="price", 
-                         color="hasPool",
-                         notched=True,
-                         title="Perbandingan Harga Berdasarkan Fasilitas")
+    with c4:
+        st.subheader("Harga Berdasarkan Kategori")
+        fig_box = px.box(df, x="category", y="price", color="category",
+                         title="Perbandingan Harga: Basic vs Luxury")
         st.plotly_chart(fig_box, use_container_width=True)
 
 # ==========================================
-# TAB 3: MACHINE LEARNING
+# TAB 3: MACHINE LEARNING (Logika Notebook)
 # ==========================================
 elif tab_selection == "Machine Learning":
-    st.title("🤖 Machine Learning Workbench")
-    
+    st.title("🤖 Pemodelan Machine Learning")
+    st.write("Proses ini mengikuti langkah-langkah di notebook: Split, Scaling, dan Hyperparameter Tuning.")
+
     # Persiapan Data
     X = df.drop(['price', 'category'], axis=1)
     y = df['price']
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s = scaler.transform(X_test)
 
-    model_type = st.selectbox("Pilih Algoritma Regresi:", ["Linear Regression", "Ridge", "Lasso"])
+    # Pilihan Model
+    model_opt = st.selectbox("Pilih Model untuk Ditampilkan:", ["Linear Regression", "Ridge (Tuned)", "Lasso (Tuned)"])
     
-    if model_type == "Linear Regression":
-        model = LinearRegression().fit(X_train_scaled, y_train)
-    elif model_type == "Ridge":
-        alpha = st.slider("Alpha (Regularization strength)", 0.1, 100.0, 1.0)
-        model = Ridge(alpha=alpha).fit(X_train_scaled, y_train)
+    # Logika tuning alpha dari notebook (np.logspace)
+    alphas = np.logspace(-3, 3, 20)
+
+    if model_opt == "Linear Regression":
+        model = LinearRegression().fit(X_train_s, y_train)
+    elif model_opt == "Ridge (Tuned)":
+        grid = GridSearchCV(Ridge(), {'alpha': alphas}, cv=5, scoring='neg_mean_squared_error')
+        grid.fit(X_train_s, y_train)
+        model = grid.best_estimator_
+        st.write(f"Best Alpha Ridge: `{grid.best_params_['alpha']:.4f}`")
     else:
-        alpha = st.slider("Alpha (Regularization strength)", 0.1, 100.0, 1.0)
-        model = Lasso(alpha=alpha).fit(X_train_scaled, y_train)
+        grid = GridSearchCV(Lasso(), {'alpha': alphas}, cv=5, scoring='neg_mean_squared_error')
+        grid.fit(X_train_s, y_train)
+        model = grid.best_estimator_
+        st.write(f"Best Alpha Lasso: `{grid.best_params_['alpha']:.4f}`")
 
-    y_pred = model.predict(X_test_scaled)
-    
-    # Evaluasi Metrics
-    c1, c2, c3 = st.columns(3)
-    c1.metric("MAE", f"{mean_absolute_error(y_test, y_pred):,.2f}")
-    c2.metric("RMSE", f"{np.sqrt(mean_squared_error(y_test, y_pred)):,.2f}")
-    c3.metric("R² Score", f"{r2_score(y_test, y_pred):.4f}")
+    y_pred = model.predict(X_test_s)
 
-    # Plot Hasil Prediksi vs Aktual
-    fig_res = px.scatter(x=y_test, y=y_pred, 
-                         labels={'x': 'Actual Price', 'y': 'Predicted Price'},
-                         title=f"Actual vs Predicted ({model_type})",
-                         opacity=0.5)
-    fig_res.add_shape(type="line", x0=y_test.min(), y0=y_test.min(), x1=y_test.max(), y1=y_test.max(),
-                      line=dict(color="Red", dash="dash"))
+    # Evaluasi
+    eval1, eval2, eval3 = st.columns(3)
+    eval1.metric("R² Score", f"{r2_score(y_test, y_pred):.4f}")
+    eval2.metric("MAE", f"{mean_absolute_error(y_test, y_pred):,.2f}")
+    eval3.metric("RMSE", f"{np.sqrt(mean_squared_error(y_test, y_pred)):,.2f}")
+
+    # Plot Hasil Prediksi
+    fig_res = px.scatter(x=y_test, y=y_pred, labels={'x': 'Nilai Asli', 'y': 'Prediksi'},
+                         title="Visualisasi Akurasi Prediksi", opacity=0.4)
+    fig_res.add_shape(type="line", x0=y.min(), y0=y.min(), x1=y.max(), y1=y.max(), line=dict(color="Red", dash="dash"))
     st.plotly_chart(fig_res, use_container_width=True)
 
 # ==========================================
 # TAB 4: PREDICTION APP
 # ==========================================
 elif tab_selection == "Prediction App":
-    st.title("🔮 Estimator Harga Rumah")
+    st.title("🔮 Kalkulator Harga Rumah")
     
-    with st.expander("Klik untuk Input Spesifikasi Rumah", expanded=True):
+    with st.form("form_pred"):
         col_in1, col_in2 = st.columns(2)
         with col_in1:
-            sqm = st.number_input("Luas Tanah (m²)", 10, 100000, 5000)
-            rooms = st.number_input("Jumlah Kamar", 1, 100, 3)
-            floors = st.number_input("Jumlah Lantai", 1, 100, 1)
-            year = st.number_input("Tahun Dibuat", 1900, 2025, 2020)
+            sqm = st.number_input("Luas (squareMeters)", 100, 100000, 50000)
+            rooms = st.number_input("Jumlah Kamar", 1, 100, 5)
+            floors = st.number_input("Lantai", 1, 100, 2)
+            year = st.number_input("Tahun (made)", 1990, 2025, 2015)
         with col_in2:
-            yard = st.checkbox("Memiliki Halaman")
-            pool = st.checkbox("Memiliki Kolam Renang")
-            newbuilt = st.checkbox("Bangunan Baru")
-            luxury = st.checkbox("Kategori Mewah (Luxury)")
+            yard = st.selectbox("Halaman?", [0, 1], format_func=lambda x: "Ya" if x==1 else "Tidak")
+            pool = st.selectbox("Kolam Renang?", [0, 1], format_func=lambda x: "Ya" if x==1 else "Tidak")
+            luxury = st.selectbox("Kategori?", [0, 1], format_func=lambda x: "Luxury" if x==1 else "Basic")
+            newbuilt = st.selectbox("Bangunan Baru?", [0, 1], format_func=lambda x: "Ya" if x==1 else "Tidak")
 
-    if st.button("Hitung Estimasi Harga"):
-        # Training model sederhana untuk kebutuhan prediksi cepat di tab ini
-        X_p = df.drop(['price', 'category'], axis=1)
-        y_p = df['price']
-        predictor = LinearRegression().fit(X_p, y_p)
+        btn = st.form_submit_button("Prediksi Harga Sekarang")
+
+    if btn:
+        # Simple model untuk prediksi di app
+        X_final = df.drop(['price', 'category'], axis=1)
+        y_final = df['price']
+        predictor = LinearRegression().fit(X_final, y_final)
         
-        # Mapping input (mengikuti urutan kolom X_p)
-        # Urutan: squareMeters, numberOfRooms, hasYard, hasPool, floors, cityCode, cityPartRange, numPrevOwners, made, isNewBuilt, hasStormProtector, basement, attic, garage, hasStorageRoom, hasGuestRoom, category_encoded
-        # (Beberapa nilai default diatur ke median agar tidak mempengaruhi hasil drastis)
-        sample_input = [[sqm, rooms, int(yard), int(pool), floors, 50000, 5, 1, year, int(newbuilt), 0, 1000, 1000, 1, 1, 1, int(luxury)]]
-        hasil = predictor.predict(sample_input)
+        # Urutan kolom disesuaikan dengan dataset asli
+        # (Beberapa fitur default menggunakan nilai rata-rata dataset)
+        user_data = [[sqm, rooms, yard, pool, floors, 50000, 5, 1, year, newbuilt, 1, 500, 500, 1, 1, 1, luxury]]
+        prediction = predictor.predict(user_data)
         
-        st.success(f"### Estimasi Harga Properti: €{hasil[0]:,.2f}")
-        st.info("Catatan: Prediksi ini didasarkan pada model Linear Regression yang dilatih pada dataset Paris Housing.")
+        st.success(f"### Estimasi Harga Properti: €{prediction[0]:,.2f}")
 
 # ==========================================
 # TAB 5: KONTAK
 # ==========================================
 elif tab_selection == "Kontak":
-    st.title("✉️ Informasi Kontak")
+    st.title("✉️ Hubungi Saya")
     st.markdown("""
-    Aplikasi ini dikembangkan sebagai bagian dari **Final Project Data Science**. 
-    Silakan hubungi saya untuk diskusi lebih lanjut:
-    
+    **Project Developer:** [Nama Anda]  
+    Project ini dikembangkan untuk memenuhi tugas **Mini Project Data Science**.
+
     - 📧 **Email:** developer@example.com
-    - 🔗 **LinkedIn:** [linkedin.com/in/namaanda](#)
-    - 💻 **GitHub:** [github.com/namaanda](#)
+    - 💼 **LinkedIn:** [linkedin.com/in/username](https://linkedin.com)
+    - 📁 **GitHub:** [github.com/username](https://github.com)
     """)
     st.balloons()
