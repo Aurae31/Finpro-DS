@@ -10,7 +10,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 # Konfigurasi Halaman
 st.set_page_config(page_title="Paris Housing Minpro", layout="wide")
 
-# --- LOAD DATA ---
+# --- LOAD DATA (Berdasarkan Notebook) ---
 @st.cache_data
 def load_data():
     df = pd.read_csv('4. Paris Housing.csv')
@@ -25,24 +25,6 @@ df = load_data()
 st.sidebar.title("Navigasi Project")
 tab_selection = st.sidebar.radio("Pilih Tab:", ["About", "Dashboard", "Machine Learning", "Prediction App", "Kontak"])
 
-# ==========================================
-# TAB 1: ABOUT
-# ==========================================
-if tab_selection == "About":
-    st.title("🏠 About Dataset - Paris Housing")
-    st.markdown("""
-    ### Paris Housing Price Dataset
-    Dataset ini memberikan gambaran komprehensif mengenai pasar properti di Paris. 
-    Melalui aplikasi ini, kita akan mengeksplorasi bagaimana fitur fisik bangunan menentukan nilai pasar.
-    
-    **Variabel dalam Dataset:**
-    - **Dimensi:** `squareMeters`, `floors`, `basement`, `attic`, `garage`.
-    - **Fasilitas:** `hasPool`, `hasYard`, `hasStormProtector`, `hasStorageRoom`.
-    - **Kualitas:** `isNewBuilt`, `category` (Basic/Luxury).
-    - **Target:** `price` (dalam Euro).
-    """)
-    st.write("#### Sampel Data Teratas:")
-    st.dataframe(df.head(10), use_container_width=True)
 # ==========================================
 # TAB 1: ABOUT
 # ==========================================
