@@ -205,8 +205,6 @@ tab_selection = st.sidebar.radio(
     ["About", "Dashboard", "Modeling", "Machine Learning", "Prediction App", "Kontak"]
 )
 
-theme_mode = st.sidebar.toggle("🌗 Dark Mode", value=True)
-
 # ==========================================
 # PAGE TRANSITION HANDLER
 # ==========================================
