@@ -152,6 +152,26 @@ div[data-testid="stPlotlyChart"] {
         transform: translateY(0);
     }
 }
+            
+/* Main app background responsive */
+.stApp {
+    background: linear-gradient(
+        180deg,
+        #f8fafc 0%,
+        #f1f5f9 100%
+    );
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+    .stApp {
+        background: #f8fafc;
+    }
+
+    div[data-testid="metric-container"] {
+        border-radius: 16px;
+    }
+}
 
 </style>
 """, unsafe_allow_html=True)
@@ -184,6 +204,8 @@ tab_selection = st.sidebar.radio(
     "Menu Utama",
     ["About", "Dashboard", "Modeling", "Machine Learning", "Prediction App", "Kontak"]
 )
+
+theme_mode = st.sidebar.toggle("🌗 Dark Mode", value=True)
 
 # ==========================================
 # PAGE TRANSITION HANDLER
