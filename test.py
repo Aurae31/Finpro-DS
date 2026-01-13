@@ -1,3 +1,4 @@
+from scipy import io
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -376,9 +377,10 @@ elif tab_selection == "Modeling":
     st.header("Step 2️⃣ Deskripsi Data")
 
     st.write("Info Dataset:")
-    buffer = []
+    buffer = io.StringIO()
     df.info(buf=buffer)
-    st.text("\n".join(buffer))
+    st.text(buffer.getvalue())
+
 
     st.write("Statistik Deskriptif:")
     st.dataframe(df.describe().T)
