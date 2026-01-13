@@ -360,174 +360,176 @@ elif tab_selection == "Modeling":
     st.title("🏫 Dokumentasi Teknis Model")
     st.markdown("Berikut adalah langkah-langkah detail (Step-by-Step) pengerjaan model machine learning beserta kode implementasinya.")
 
-    # --- STEP 1 ---
+    # ==============================
+    # INIT SESSION STATE
+    # ==============================
+    for k in ["df", "df_clean", "X", "y", "X_train", "X_test",
+              "y_train", "y_test", "X_train_scaled", "X_test_scaled",
+              "lr", "ridge", "lasso"]:
+        if k not in st.session_state:
+            st.session_state[k] = None
+
+    # ==============================
+    # STEP 1
+    # ==============================
     st.header("Step 1: Import & Eksplorasi Data")
     st.write("Langkah pertama adalah memuat library yang dibutuhkan dan membaca dataset.")
-    st.code("""
-import pandas as pd
-import numpy as np
+    st.code("""df = pd.read_csv('4. Paris Housing.csv')""", language="python")
 
-# Membaca dataset
-df = pd.read_csv('4. Paris Housing.csv')
+    if st.button("▶ Run Step 1"):
+        df = pd.read_csv("4. Paris Housing.csv")
+        st.session_state.df = df
+        st.session_state.numbers = df.select_dtypes(include="number").columns
+        st.session_state.categories = df.select_dtypes(exclude="number").columns
 
-# Memisahkan kolom numerik dan kategorik
-numbers = df.select_dtypes(include=['number']).columns
-categories = df.select_dtypes(exclude=['number']).columns
-    """, language='python')
+    if st.session_state.df is not None:
+        st.subheader("📊 Output Step 1")
+        st.dataframe(st.session_state.df.head())
+        st.write("Shape:", st.session_state.df.shape)
+        st.write("Numerik:", list(st.session_state.numbers))
+        st.write("Kategorikal:", list(st.session_state.categories))
 
-    # --- STEP 2 ---
+    # ==============================
+    # STEP 2
+    # ==============================
     st.header("Step 2: Data Cleaning (Outlier & Encoding)")
     st.write("Kami membersihkan data dari nilai ekstrem (Outlier) menggunakan metode IQR dan mengubah data teks menjadi angka.")
-    
-    with st.expander("Lihat Kode Cleaning & Encoding"):
-        st.markdown("**a. Deteksi Outlier (IQR Method)**")
-        st.code("""
-# Menghitung batas Quartile
-Q1 = df[numbers].quantile(0.25)
-Q3 = df[numbers].quantile(0.75)
-IQR = Q3 - Q1
 
-lower_bound = Q1 - 1.5 * IQR
-upper_bound = Q3 + 1.5 * IQR
+    if st.button("▶ Run Step 2"):
+        df = st.session_state.df
+        Q1 = df[st.session_state.numbers].quantile(0.25)
+        Q3 = df[st.session_state.numbers].quantile(0.75)
+        IQR = Q3 - Q1
 
-# Memfilter data (Hanya menyimpan data yang BUKAN outlier)
-df_clean = df[~((df[numbers] < lower_bound) | (df[numbers] > upper_bound)).any(axis=1)]
-        """, language='python')
-        
-        st.markdown("**b. Label Encoding**")
-        st.code("""
-from sklearn.preprocessing import LabelEncoder
+        df_clean = df[
+            ~((df[st.session_state.numbers] < (Q1 - 1.5 * IQR)) |
+              (df[st.session_state.numbers] > (Q3 + 1.5 * IQR))).any(axis=1)
+        ]
 
-# Mengubah 'Basic'/'Luxury' menjadi 0/1
-le = LabelEncoder()
-df_clean['category_encoded'] = le.fit_transform(df_clean['category'])
-        """, language='python')
+        df_clean["category"] = LabelEncoder().fit_transform(df_clean["category"])
+        st.session_state.df_clean = df_clean
 
-    # --- STEP 3 ---
+    if st.session_state.df_clean is not None:
+        st.subheader("📊 Output Step 2")
+        st.write("Sebelum:", st.session_state.df.shape[0])
+        st.write("Sesudah:", st.session_state.df_clean.shape[0])
+        st.dataframe(st.session_state.df_clean.head())
+
+    # ==============================
+    # STEP 3
+    # ==============================
     st.header("Step 3: Feature Selection & VIF Standarized")
-    st.write("Memilih fitur yang relevan dan menghapus fitur yang memiliki multikolinearitas tinggi (VIF) atau tidak berguna.")
-    
-    st.code("""
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)
+    if st.button("▶ Run Step 3"):
+        X = st.session_state.df_clean.drop("price", axis=1)
+        y = st.session_state.df_clean["price"]
 
-vif_data = pd.DataFrame()
-vif_data["Feature"] = X_scaled_df.columns
-vif_data["VIF"] = [
-    variance_inflation_factor(X_scaled_df.values, i)
-    for i in range(X_scaled_df.shape[1])
-]
-print(vif_data)
-""", language="python")
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)
 
-    # --- STEP 4 ---
+        vif_df = pd.DataFrame({
+            "Feature": X.columns,
+            "VIF": [
+                variance_inflation_factor(X_scaled_df.values, i)
+                for i in range(X_scaled_df.shape[1])
+            ]
+        })
+
+        st.session_state.X = X
+        st.session_state.y = y
+        st.session_state.vif = vif_df
+
+    if st.session_state.X is not None:
+        st.subheader("📊 Output Step 3")
+        st.dataframe(st.session_state.vif)
+
+    # ==============================
+    # STEP 4
+    # ==============================
     st.header("Step 4: Splitting & Scaling")
-    st.write("Membagi data latih/uji dan melakukan standardisasi (Z-Score Normalization) agar skala data seragam.")
-    
-    st.code("""
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
-# 1. Split Data (80% Train, 20% Test)
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    if st.button("▶ Run Step 4"):
+        X_train, X_test, y_train, y_test = train_test_split(
+            st.session_state.X,
+            st.session_state.y,
+            test_size=0.2,
+            random_state=42
+        )
 
-# 2. Scaling (Fit pada train, Transform pada test)
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-    """, language='python')
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
 
-    # --- STEP 5 ---
+        st.session_state.X_train = X_train
+        st.session_state.X_test = X_test
+        st.session_state.y_train = y_train
+        st.session_state.y_test = y_test
+        st.session_state.X_train_scaled = X_train_scaled
+        st.session_state.X_test_scaled = X_test_scaled
+
+    if st.session_state.X_train is not None:
+        st.subheader("📊 Output Step 4")
+        st.write("X_train:", st.session_state.X_train.shape)
+        st.write("X_test:", st.session_state.X_test.shape)
+
+    # ==============================
+    # STEP 5
+    # ==============================
     st.header("Step 5: Modeling & Hyperparameter Tuning")
-    st.write("Melatih model menggunakan Linear Regression, Ridge, dan Lasso. Khusus Ridge/Lasso, kita mencari `alpha` terbaik menggunakan GridSearch.")
 
-    tab_m1, tab_m2, tab_m3 = st.tabs(["Linear Regression", "Ridge (Tuning)", "Lasso (Tuning)"])
-    
-    with tab_m1:
-        st.write("Model dasar tanpa tuning.")
-        st.code("""
-from sklearn.linear_model import LinearRegression
+    if st.button("▶ Run Step 5"):
+        lr = LinearRegression()
+        lr.fit(st.session_state.X_train_scaled, st.session_state.y_train)
 
-model = LinearRegression()
-model.fit(X_train_scaled, Y_train)
-Y_pred = model.predict(X_test_scaled)
-        """, language='python')
+        ridge = GridSearchCV(Ridge(), {"alpha": np.logspace(-3, 3, 20)}, cv=5)
+        ridge.fit(st.session_state.X_train_scaled, st.session_state.y_train)
 
-    with tab_m2:
-        st.write("Ridge Regression dengan pencarian parameter alpha otomatis.")
-        st.code("""
-from sklearn.linear_model import Ridge
-from sklearn.model_selection import GridSearchCV
+        lasso = GridSearchCV(Lasso(max_iter=10000),
+                             {"alpha": np.logspace(-3, 3, 20)}, cv=5)
+        lasso.fit(st.session_state.X_train_scaled, st.session_state.y_train)
 
-# Menentukan kandidat alpha (dari 0.001 sampai 1000)
-alphas = np.logspace(-3, 3, 20)
-param_grid = {'alpha': alphas}
+        st.session_state.lr = lr
+        st.session_state.ridge = ridge
+        st.session_state.lasso = lasso
 
-# Grid Search
-grid = GridSearchCV(Ridge(), param_grid, cv=5, scoring='neg_mean_squared_error')
-grid.fit(X_train_scaled, Y_train)
+    if st.session_state.lr is not None:
+        st.subheader("📊 Output Step 5")
+        coef_df = pd.DataFrame({
+            "Feature": st.session_state.X.columns,
+            "Coefficient": st.session_state.lr.coef_
+        })
+        st.dataframe(coef_df)
+        st.write("Best Ridge Alpha:", st.session_state.ridge.best_params_)
+        st.write("Best Lasso Alpha:", st.session_state.lasso.best_params_)
 
-best_model = grid.best_estimator_
-print(f"Alpha Terbaik: {grid.best_params_}")
-        """, language='python')
-
-    with tab_m3:
-        st.write("Lasso Regression untuk seleksi fitur otomatis.")
-        st.code("""
-from sklearn.linear_model import Lasso
-
-# Proses sama seperti Ridge
-grid_lasso = GridSearchCV(Lasso(), param_grid, cv=5, scoring='neg_mean_squared_error')
-grid_lasso.fit(X_train_scaled, Y_train)
-
-best_lasso = grid_lasso.best_estimator_
-        """, language='python')
-
-    # --- STEP 6 ---
+    # ==============================
+    # STEP 6
+    # ==============================
     st.header("Step 6: Evaluasi & Kesimpulan Model")
-    st.write("Berikut adalah performa dari ketiga model yang diuji:")
 
-    # Simulasi Metrik (Berdasarkan hasil umum dataset Paris Housing)
-    eval_data = {
-        "Model": ["Linear Regression", "Ridge Regression", "Lasso Regression"],
-        "MAE": ["~1,500", "~1,510", "~1,509"],
-        "R2 Score": ["1.0000", "0.9999", "1.0000"],
-        "Karakteristik": ["Simple & Fast", "Mencegah Overfitting", "Seleksi Fitur Otomatis"]
-    }
-    st.table(pd.DataFrame(eval_data))
+    if st.button("▶ Run Step 6"):
+        def eval(y, yhat):
+            return {
+                "MAE": mean_absolute_error(y, yhat),
+                "RMSE": np.sqrt(mean_squared_error(y, yhat)),
+                "R2": r2_score(y, yhat)
+            }
 
-    st.subheader("📌 Kesimpulan Setiap Model")
-    
-    c_m1, c_m2, c_m3 = st.columns(3)
-    with c_m1:
-        st.markdown("""
-        **1. Linear Regression**
-        - **Kesimpulan:** Memberikan akurasi tertinggi pada data sintetis ini. Namun, sangat sensitif terhadap outlier jika tidak dibersihkan.
-        - **Status:** Sangat Akurat.
-        """)
-    with c_m2:
-        st.markdown("""
-        **2. Ridge Regression**
-        - **Kesimpulan:** Menggunakan regularisasi L2. Meskipun R² sedikit lebih rendah dari Linear, model ini lebih stabil terhadap fluktuasi data.
-        - **Status:** Paling Stabil.
-        """)
-    with c_m3:
-        st.markdown("""
-        **3. Lasso Regression**
-        - **Kesimpulan:** Menggunakan regularisasi L1 yang dapat menyusutkan koefisien fitur tidak penting menjadi nol. Sangat efisien untuk dataset besar.
-        - **Status:** Paling Efisien.
-        """)
+        eval_df = pd.DataFrame([
+            eval(st.session_state.y_test,
+                 st.session_state.lr.predict(st.session_state.X_test_scaled)),
+            eval(st.session_state.y_test,
+                 st.session_state.ridge.predict(st.session_state.X_test_scaled)),
+            eval(st.session_state.y_test,
+                 st.session_state.lasso.predict(st.session_state.X_test_scaled))
+        ], index=["Linear", "Ridge", "Lasso"])
 
-    st.divider()
-    
-    st.subheader("💡 Rekomendasi Akhir")
-    st.success("""
-    Berdasarkan pengujian, **Linear Regression** adalah pilihan terbaik jika data bersifat linear sempurna seperti dataset ini. 
-    Namun, untuk **implementasi di dunia nyata** yang memiliki banyak gangguan (noise), kami merekomendasikan **Ridge Regression** karena kemampuannya dalam menjaga bobot fitur agar tidak ekstrem, sehingga model lebih 'tahan banting' terhadap data baru yang tidak terduga.
-    """)
+        st.session_state.eval = eval_df
+
+    if "eval" in st.session_state:
+        st.subheader("📊 Output Step 6")
+        st.dataframe(st.session_state.eval)
 
 # ==========================================
 # TAB MACHINE LEARNING
