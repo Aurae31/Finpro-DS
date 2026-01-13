@@ -531,6 +531,67 @@ elif tab_selection == "Modeling":
         st.subheader("📊 Output Step 6")
         st.dataframe(st.session_state.eval)
 
+    # ==============================
+    # KESIMPULAN & REKOMENDASI AKHIR
+    # ==============================
+    st.divider()
+    st.header("📌 Kesimpulan & Rekomendasi Akhir")
+
+    if "eval" in st.session_state:
+        eval_df = st.session_state.eval
+
+        best_model = eval_df["R2"].idxmax()
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.subheader("📊 Kesimpulan Utama")
+            st.markdown(f"""
+            **Berdasarkan seluruh tahapan modeling (Step 1–6), dapat disimpulkan bahwa:**
+
+            - Dataset **telah bersih** dari outlier dan multikolinearitas tinggi.
+            - Semua fitur numerik berhasil distandarisasi dengan baik.
+            - Ketiga model regresi (**Linear, Ridge, Lasso**) menunjukkan performa yang **sangat baik**.
+            - Model dengan performa terbaik berdasarkan **R² Score** adalah:
+
+            ### 🏆 **{best_model} Regression**
+            """)
+
+        with col2:
+            st.subheader("📈 Ringkasan Performa Model")
+            st.dataframe(eval_df.style.format("{:.4f}"))
+
+        st.subheader("🎯 Rekomendasi Implementasi")
+
+        st.success("""
+        **Rekomendasi akhir penggunaan model:**
+
+        ✅ **Linear Regression**
+        - Gunakan jika hubungan antar variabel bersifat **linear kuat**
+        - Cocok untuk dataset yang telah dibersihkan secara menyeluruh
+        - Interpretasi paling mudah
+
+        ✅ **Ridge Regression**
+        - Direkomendasikan untuk **deployment di dunia nyata**
+        - Lebih stabil terhadap noise & multikolinearitas
+        - Risiko overfitting lebih kecil
+
+        ✅ **Lasso Regression**
+        - Cocok untuk **feature selection otomatis**
+        - Berguna jika jumlah fitur sangat banyak
+        - Efisien untuk pipeline yang lebih ringan
+        """)
+
+        st.info("""
+        💡 **Catatan Penting:**
+        Untuk penggunaan produksi (production), disarankan menggunakan **Ridge Regression**
+        karena memberikan keseimbangan terbaik antara akurasi, stabilitas, dan generalisasi model.
+        """)
+
+    else:
+        st.warning("⚠ Jalankan **Step 6 (Evaluasi Model)** terlebih dahulu untuk menampilkan kesimpulan dan rekomendasi.")
+
+
 # ==========================================
 # TAB MACHINE LEARNING
 # ==========================================
